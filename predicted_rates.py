@@ -403,7 +403,7 @@ for route in DAT_routes:
 
         # making future date
         indices = []
-        for index in range(0, days_prediction):
+        for index in range(1, days_prediction+1):
             new_date = last_date+timedelta(days=index)
             indices.append(new_date)
             month_end = pd.to_datetime(new_date+MonthEnd(1))
@@ -503,9 +503,9 @@ predictions = predictions.set_index('index')
 
 
 predictions = predictions.reset_index().rename(columns={'index': 'date'})
-predictions['prediction_date'] = str(
-    datetime.now().year*10000+datetime.now().month*100+datetime.now().day)
-
+# predictions['prediction_date']=str(datetime.now().year*10000+datetime.now().month*100+datetime.now().day)
+predictions['prediction_date'] = (
+    datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')
 
 # In[105]:
 

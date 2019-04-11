@@ -9,37 +9,41 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 from datetime import timedelta
+import mysql.connector as sql
 
 
-def query_api(ticker, granularity, *dates):
+def get_access_token():
+    url = "https://api.freightwaves.com/Credential/authenticate"
+    data = {
+        "username": "MergeTransitUser",
+        "password": "F74g6eqPM@?g&tKs"
+    }
+    res_data = requests.post(url, json=data).json()['token']
+    return res_data
+
+
+def query_api(token, ticker, granularity, *dates):
      # function to query SONAR API, returns data frame with date and ticker values
+    start_date = dates[0]
+    end_date = dates[1]
+    url_base = 'https://api.freightwaves.com/data/{0}/{1}/{2}/{3}'
+    url = url_base.format(ticker, granularity, start_date, end_date)
+    r = requests.get(url,  headers={"Authorization": "Bearer " + token})
 
-    if len(dates) > 0:
-        start_date = dates[0]
-        end_date = dates[1]
-        url_base = 'https://dev.freightwaves.com/public/TruckingIndexDataRaw.aspx?key=c419cfc6-9266-4003-974a-5e8e9cad8729&symbol' + \
-            '={0}.{1}&date={2}&date_end={3}'
-        url = url_base.format(ticker, granularity, start_date, end_date)
-    else:
-        url_base = 'https://dev.freightwaves.com/public/TruckingIndexDataRaw.aspx?key=c419cfc6-9266-4003-974a-5e8e9cad8729&symbol' + \
-            '={0}.{1}'
-        url = url_base.format(ticker, granularity)
-    response = requests.get(url).text
-
-    if len(response) < 100:
-        return pd.DataFrame()
-
-    else:
+    if r.status_code == 200:
+        response = r.text
         data = json.loads(response)
         data = pd.DataFrame(data)
 
-        data['date'] = pd.to_datetime(data['data_timestamp']).dt.date
+        data['date'] = pd.to_datetime(data['data_Timestamp']).dt.date
 
-        column_name = ticker+'_'+granularity
-        data = data.rename(columns={'data_value': column_name})
+        column_name = ticker + '_' + granularity
+        data = data.rename(columns={'data_Value': column_name})
         data[column_name] = data[column_name].astype(float)
-
         return data[['date', column_name]]
+
+    else:
+        return pd.DataFrame()
 
 
 # In[164]:
@@ -47,10 +51,11 @@ def query_api(ticker, granularity, *dates):
 
 def get_sql(sql_query):
     # function to query internal DB
-    import mysql.connector as sql
 
     db_connection = sql.connect(
         host='157.230.166.29', database='lanecaster_db', user='root', password='lanecaster1!')
+    # db_connection = sql.connect(
+    #     host='localhost', database='lanecaster_db', user='root', password='')
     df = pd.read_sql(sql_query, con=db_connection)
     db_connection.close()
 
@@ -62,11 +67,12 @@ def get_sql(sql_query):
 
 def update_new_rows_mysql(pandas_dataframe, table_name):
      # function to update the dataframe to internal DB
-    import mysql.connector as sql
 
     # change the connection parameters if needed
     db_connection = sql.connect(
         host='157.230.166.29', database='lanecaster_db', user='root', password='lanecaster1!')
+    # db_connection = sql.connect(
+    #     host='localhost', database='lanecaster_db', user='root', password='')
     mycursor = db_connection.cursor(buffered=True)
 
     # formating date column as string
@@ -114,32 +120,32 @@ select * from sonar_input
 sonar_input = get_sql(sql_query)
 # in DB missing values are stores as 0
 sonar_input = sonar_input.replace(0.0, np.nan)
-
-end_date = str(datetime.now().year*10000 +
-               datetime.now().month*100+datetime.now().day)
+# end_date = (datetime.today() - timedelta(days=1)).strftime('%Y-%m-%d')
+end_date = (datetime.today()).strftime('%Y-%m-%d')
 
 flat_file = pd.DataFrame()
+token = get_access_token()
 for column in sonar_input.columns[2:]:
 
     existing_data = sonar_input[[column, 'date', 'id']].dropna()
 
-    start_date = pd.to_datetime(existing_data['date'].max())
-    start_date = start_date+timedelta(days=1)
-    start_date = str(start_date.year*10000+start_date.month*100+start_date.day)
+    last_date = pd.to_datetime(existing_data['date'].max())
+    start_date = (last_date + timedelta(days=1)).strftime('%Y-%m-%d')
+    start_id = existing_data['id'].max() + 1
 
-    last_id = existing_data['id'].max()
-    start_id = last_id+1
-
-    data = query_api(column.split('_')[0], column.split('_')[
-                     1], start_date, end_date)
+    data = query_api(token, column.split(
+        '_')[0], column.split('_')[1], start_date, end_date)
     data['id'] = start_id
-    data['id'] = data['id']+data.index
+    data['id'] = data['id'] + data.index
     flat_file = pd.concat([flat_file, data], sort=True)
+    print("get data " + start_date + "~" + end_date,
+          column.split('_')[0], column.split('_')[1])
 
 flat_file = pd.DataFrame(flat_file.groupby('date').max()).reset_index()
 flat_file = flat_file.sort_values(by='date')
-flat_file.to_csv(str(datetime.now().year*1000+datetime.now().month *
-                     100+datetime.now().day) + r'.csv', encoding='utf-8', index=False)
+before_date = datetime.now() - timedelta(days=1)
+flat_file.to_csv(str(before_date.year*10000 + before_date.month *
+                     100+before_date.day) + r'.csv', encoding='utf-8', index=False)
 
 
 for_upload = pd.concat(
