@@ -1,6 +1,21 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+#holidays in 2019
+holidays=[pd.to_datetime('2019-01-01').date(),\
+pd.to_datetime('2019-01-21').date(),\
+pd.to_datetime('2019-02-18').date(),\
+pd.to_datetime('2019-05-27').date(),\
+pd.to_datetime('2019-07-04').date(),\
+pd.to_datetime('2019-09-02').date(),\
+pd.to_datetime('2019-10-14').date(),\
+pd.to_datetime('2019-11-11').date(),\
+pd.to_datetime('2019-11-28').date(),\
+pd.to_datetime('2019-12-25').date(),\
+]
+
+
+
 # goal of this code is to update sonar table with the latest data
 
 import json
@@ -460,7 +475,7 @@ def update_predicted_rates():
     DAT_routes = [x[0] + x[1] for x in DAT_routes]
 
     days_prediction = 7
-    holidays = [pd.to_datetime('2019-01-11').date()]
+
 
     predictions = pd.DataFrame()
 
@@ -588,7 +603,23 @@ def update_predicted_rates():
     print(predictions)
     # predictions.to_csv(r'predictions.csv', encoding='utf-8')
 
-    # update_new_rows_mysql(predictions, 'predicted_rates')
+    #update_new_rows_mysql(predictions, 'predicted_rates')
+    
+    #prices per trip
+    sql_query='''
+    select * from distance
+    '''
+
+    distance_df=get_sql(sql_query)
+
+    #multiplying distance and rate
+    predictions_prices=predictions.copy()
+    for column in [x for x in predictions_prices.columns if x not in ['date','prediction_date', 'id']]:
+        predictions_prices[column]=predictions_prices[column]*distance_df[distance_df['route']==column]['miles'].values[0]
+    #VV 20190410, removing additional quotes
+    predictions_prices['date']=predictions_prices['date'].apply(lambda x: x.replace("'",''))    
+    #update_new_rows_mysql(predictions_prices, 'predicted_trips_prices')
+    
 
 
 # update_sonar_input()
