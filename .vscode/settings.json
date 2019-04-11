@@ -1,0 +1,15 @@
+{
+    "python.formatting.autopep8Args": [
+        "--max-line-length",
+        "2000",
+        "--experimental"
+    ],
+    "python.formatting.yapfArgs": [
+        "--style",
+        "{based_on_style: chromium, indent_width: 20}"
+    ],
+    "python.formatting.blackArgs": [
+        "--line-length",
+        "200"
+    ]
+}
