@@ -523,7 +523,24 @@ def update_predicted_rates():
         predictions = pd.concat([predictions, data_predict[[route]].dropna()], sort=True)
 
     predictions = pd.DataFrame(predictions.reset_index().groupby('index').mean())
+    
+    ###fixing outliers, crazy predictions when model breaks
+    for column in predictions.columns:
+        predictions[column+'_dev']=predictions[column].apply(lambda x: np.abs(x))
+        predictions[column+'_dev']=(predictions[column+'_dev']-predictions[column+'_dev'].mean())/predictions[column+'_dev'].std()
 
+        predictions[column+'_num_positive']=predictions[predictions[column+'_dev']>0].shape[0]
+        predictions[column+'_outlier']=predictions[[column+'_dev',column+'_num_positive']].apply(lambda x: 1 if \
+        (x[0]>1.5) & (x[1]==1) else 0, axis=1)
+
+        if predictions[column+'_outlier'].max()==1:
+            sign_outlier=np.sign(predictions.loc[(predictions[column+'_outlier']==1),column]).values[0]
+            predictions.loc[predictions[column+'_outlier']==1,column]=predictions.loc[(predictions[column+'_outlier']==0\
+            )&(np.sign(predictions[column])==sign_outlier),column].mean()
+    
+    predictions=predictions.drop(\
+    [x for x in predictions.columns if ('_dev' in x) | ('_num_positive' in x) | ('_outlier' in x) ], 1)
+    
     # # now appending DAT data
 
     # get existing DAT data
