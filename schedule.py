@@ -460,8 +460,17 @@ def update_predicted_rates():
     DAT_routes = [x[0] + x[1] for x in DAT_routes]
 
     days_prediction = 7
-    holidays = [pd.to_datetime('2019-01-11').date()]
-
+    holidays = [pd.to_datetime('2019-01-01').date(),\
+    pd.to_datetime('2019-01-21').date(),\
+    pd.to_datetime('2019-02-18').date(),\
+    pd.to_datetime('2019-05-27').date(),\
+    pd.to_datetime('2019-07-04').date(),\
+    pd.to_datetime('2019-09-02').date(),\
+    pd.to_datetime('2019-10-14').date(),\
+    pd.to_datetime('2019-11-11').date(),\
+    pd.to_datetime('2019-11-28').date(),\
+    pd.to_datetime('2019-12-25').date()]
+    
     predictions = pd.DataFrame()
 
     # now need to generate data and predict for each of the routes
@@ -529,7 +538,7 @@ def update_predicted_rates():
         predictions[column+'_dev']=predictions[column].apply(lambda x: np.abs(x))
         predictions[column+'_dev']=(predictions[column+'_dev']-predictions[column+'_dev'].mean())/predictions[column+'_dev'].std()
 
-        predictions[column+'_num_positive']=predictions[predictions[column+'_dev']>0].shape[0]
+        predictions[column+'_num_positive']=predictions[predictions[column+'_dev']>0.5].shape[0]
         predictions[column+'_outlier']=predictions[[column+'_dev',column+'_num_positive']].apply(lambda x: 1 if \
         (x[0]>1.5) & (x[1]==1) else 0, axis=1)
 
@@ -578,7 +587,14 @@ def update_predicted_rates():
     predictions = predictions.reset_index()
     for prediction_index in predictions.index[-7:]:
         for column in [x for x in predictions.columns if x != 'index']:
-            predictions.loc[prediction_index, column] = predictions.loc[prediction_index, column] + predictions.loc[prediction_index-7, column]
+            
+            #not allowing negative rate, use value from previous week in that case
+            if (predictions.loc[prediction_index,column]+ predictions.loc[prediction_index-7,column])<=0:
+                predictions.loc[prediction_index,column]=predictions.loc[prediction_index-7,column]
+            else:
+                predictions.loc[prediction_index,column]=predictions.loc[prediction_index,column]+ \
+                predictions.loc[prediction_index-7,column]
+            
     predictions = predictions.set_index('index')
 
     # In[104]:
